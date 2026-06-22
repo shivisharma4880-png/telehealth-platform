@@ -1,0 +1,10 @@
+# TLS + routing for DuckDNS + Docker Compose (merge docker-compose.caddy.yml).
+# /api/* → FastAPI (port 8000 in container); everything else → Next.js (3000).
+
+telehealthapp.duckdns.org {
+	encode zstd gzip
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	reverse_proxy frontend:3000
+}

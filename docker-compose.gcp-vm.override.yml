@@ -1,0 +1,29 @@
+# Merge with docker-compose.prod.yml on a single GCP VM when you want Postgres on-box:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.gcp-vm.override.yml up -d
+# Set POSTGRES_PASSWORD only; backend DATABASE_URL is set here (so `docker compose down` works without exporting DATABASE_URL).
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: telehealth
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for bundled Postgres}
+      POSTGRES_DB: telehealth_db
+    volumes:
+      - postgres_vm_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telehealth -d telehealth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://telehealth:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD for bundled Postgres}@db:5432/telehealth_db"
+
+volumes:
+  postgres_vm_data:

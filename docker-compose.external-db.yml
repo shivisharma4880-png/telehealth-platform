@@ -1,0 +1,9 @@
+# Merge when the backend uses Postgres outside this compose project (no `db` service).
+# Example:
+#   export DATABASE_URL='postgresql://user:pass@HOST:5432/telehealth_db'
+#   docker compose -f docker-compose.prod.yml -f docker-compose.external-db.yml -f docker-compose.caddy.yml up -d
+
+services:
+  backend:
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL for external Postgres}

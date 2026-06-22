@@ -1,0 +1,30 @@
+# Optional TLS reverse proxy (Caddy). Merge after prod (and optional gcp-vm override):
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.gcp-vm.override.yml -f docker-compose.caddy.yml up -d
+#
+# Prerequisites (VM):
+#   1. DuckDNS: telehealthapp.duckdns.org → VM external IP (update if IP changes).
+#   2. GCP firewall: allow TCP 80 and 443 to this VM; avoid exposing 3000/8000 publicly.
+#   3. Rebuild frontend image with NEXT_PUBLIC_API_URL=https://telehealthapp.duckdns.org
+#   4. Runtime: NEXTAUTH_URL, ALLOWED_ORIGINS use https://telehealthapp.duckdns.org
+#
+# Do not run host-installed Caddy/nginx on 80/443 at the same time.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

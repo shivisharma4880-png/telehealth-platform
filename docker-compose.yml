@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: telehealth
+      POSTGRES_PASSWORD: telehealth_secret
+      POSTGRES_DB: telehealth_db
+    # Host 5433 avoids clashing with a local Postgres on 5432 (Homebrew, Postgres.app).
+    # Containers still use db:5432 on the Docker network.
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telehealth -d telehealth_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Host 8001 avoids clashing with other stacks (e.g. another API on 8000).
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://telehealth:telehealth_secret@db:5432/telehealth_db
+      JWT_SECRET: ${JWT_SECRET:-supersecretjwtkey_change_in_production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-supersecretrefreshjwtkey_change_in_production}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_LLM_MODEL: ${GROQ_LLM_MODEL:-llama-3.3-70b-versatile}
+      GROQ_STT_MODEL: ${GROQ_STT_MODEL:-whisper-large-v3-turbo}
+      GROQ_TTS_MODEL: ${GROQ_TTS_MODEL:-canopylabs/orpheus-v1-english}
+      GROQ_TTS_VOICE: ${GROQ_TTS_VOICE:-troy}
+      GROQ_TTS_RESPONSE_FORMAT: ${GROQ_TTS_RESPONSE_FORMAT:-wav}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-mock}
+      SMS_PROVIDER_KEY: ${SMS_PROVIDER_KEY:-mock}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - prescription_pdfs:/app/pdfs
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-nextsecret_change_in_production}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  prescription_pdfs:

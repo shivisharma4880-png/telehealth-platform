@@ -1,0 +1,48 @@
+# Production stack: images from Artifact Registry.
+# Set BACKEND_IMAGE, FRONTEND_IMAGE, NEXTAUTH_*, ALLOWED_ORIGINS, etc.
+# Postgres: merge docker-compose.gcp-vm.override.yml (bundled DB) OR docker-compose.external-db.yml (external DATABASE_URL).
+#
+# HTTPS (DuckDNS + Docker Caddy): use the same public origin for UI and API, e.g.
+#   ALLOWED_ORIGINS=https://telehealthapp.duckdns.org
+#   NEXTAUTH_URL=https://telehealthapp.duckdns.org
+# Rebuild the frontend image with NEXT_PUBLIC_API_URL=https://telehealthapp.duckdns.org
+# (baked at build time). Then merge docker-compose.caddy.yml — see deploy/caddy/README.md.
+#
+# Example:
+#   export BACKEND_IMAGE=asia-south1-docker.pkg.dev/PROJECT/telehealth/backend:latest
+#   export FRONTEND_IMAGE=asia-south1-docker.pkg.dev/PROJECT/telehealth/frontend:latest
+#   docker compose -f docker-compose.prod.yml -f docker-compose.caddy.yml up -d
+#
+# backend/frontend do not publish host ports; they are only on the Compose network.
+# Public access: merge docker-compose.caddy.yml (80/443). Debug: docker compose exec frontend wget -qO- http://localhost:3000/
+
+services:
+  backend:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE to Artifact Registry path}
+    restart: unless-stopped
+    environment:
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set JWT_REFRESH_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_LLM_MODEL: ${GROQ_LLM_MODEL:-llama-3.3-70b-versatile}
+      GROQ_STT_MODEL: ${GROQ_STT_MODEL:-whisper-large-v3-turbo}
+      GROQ_TTS_MODEL: ${GROQ_TTS_MODEL:-canopylabs/orpheus-v1-english}
+      GROQ_TTS_VOICE: ${GROQ_TTS_VOICE:-troy}
+      GROQ_TTS_RESPONSE_FORMAT: ${GROQ_TTS_RESPONSE_FORMAT:-wav}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-mock}
+      SMS_PROVIDER_KEY: ${SMS_PROVIDER_KEY:-mock}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?Set ALLOWED_ORIGINS e.g. https://telehealthapp.duckdns.org}
+    volumes:
+      - prescription_pdfs:/app/pdfs
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?Set FRONTEND_IMAGE to Artifact Registry path}
+    restart: unless-stopped
+    environment:
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL e.g. https://telehealthapp.duckdns.org}
+
+volumes:
+  prescription_pdfs:
